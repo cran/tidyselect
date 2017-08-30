@@ -29,10 +29,10 @@ test_that("abort on unknown columns", {
   expect_error(vars_select(letters, c("a", "bar", "foo", "d")), "bar, foo")
 })
 
-test_that("symbol overscope is isolated from context", {
+test_that("symbol overscope is not isolated from context", {
   foo <- 10
-  expect_error(vars_select(letters, foo), "object 'foo' not found")
-  expect_error(vars_select(letters, ((foo))), "object 'foo' not found")
+  expect_identical(vars_select(letters, foo), c(j = "j"))
+  expect_identical(vars_select(letters, ((foo))), c(j = "j"))
 })
 
 test_that("symbol overscope works with parenthesised expressions", {
@@ -49,6 +49,41 @@ test_that("can customise error messages", {
 
   expect_error(vars_select(vars, "foo"), "match variable names. Unknown variables:")
   expect_warning(vars_select(vars, one_of("bim")), "Unknown variables:")
-  expect_error(vars_rename(vars, A = "foo"), "contains unknown variables")
+  expect_error(vars_rename(vars, A = "foo"), "Unknown variable `foo`")
   expect_error(vars_pull(vars, !! c("a", "b")), "or a variable name")
+})
+
+test_that("can supply empty inputs", {
+  empty_vars <- set_names(chr())
+  expect_identical(vars_select(letters), empty_vars)
+  expect_identical(vars_select(letters, NULL), empty_vars)
+  expect_identical(vars_select(letters, chr()), empty_vars)
+
+  expect_identical(vars_select(letters, a, NULL), c(a = "a"))
+  expect_identical(vars_select(letters, a, chr()), c(a = "a"))
+})
+
+test_that("unknown variables errors are ignored if `.strict` is FALSE", {
+  expect_identical(vars_select(letters, `_foo`, .strict = FALSE), set_names(chr()))
+  expect_identical(vars_select(letters, a, `_foo`, .strict = FALSE), c(a = "a"))
+  expect_identical(vars_select(letters, a, "_foo", .strict = FALSE), c(a = "a"))
+
+  expect_identical(vars_select(letters, a, -`_foo`, .strict = FALSE), c(a = "a"))
+  expect_identical(vars_select(letters, a, -"`_foo`", .strict = FALSE), c(a = "a"))
+
+  expect_identical(vars_select(letters, c(a, `_foo`, c), .strict = FALSE), c(a = "a", c = "c"))
+  expect_identical(vars_select(letters, c(a, "_foo", c), .strict = FALSE), c(a = "a", c = "c"))
+})
+
+test_that("`:` handles strings", {
+  expect_identical(vars_select(letters, "b":"d"), vars_select(letters, b:d))
+  expect_error(vars_select(letters, "b":"Z"), "Unknown column `Z`")
+})
+
+test_that("`-` handles strings", {
+  expect_identical(vars_select(letters, -"c"), vars_select(letters, -c))
+})
+
+test_that("`-` handles positions", {
+  expect_identical(vars_select(letters, 10 - 7), vars_select(letters, 3))
 })

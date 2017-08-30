@@ -7,7 +7,7 @@ using namespace Rcpp;
 
 // inds_combine
 SEXP inds_combine(CharacterVector vars, ListOf<IntegerVector> xs);
-RcppExport SEXP tidyselect_inds_combine(SEXP varsSEXP, SEXP xsSEXP) {
+RcppExport SEXP _tidyselect_inds_combine(SEXP varsSEXP, SEXP xsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -19,7 +19,7 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"tidyselect_inds_combine", (DL_FUNC) &tidyselect_inds_combine, 2},
+    {"_tidyselect_inds_combine", (DL_FUNC) &_tidyselect_inds_combine, 2},
     {NULL, NULL, 0}
 };
 

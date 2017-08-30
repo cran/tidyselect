@@ -1,18 +1,13 @@
 #' @import rlang
 #' @importFrom glue glue
+#' @importFrom purrr discard map map_chr map_if map_lgl map2 map2_chr
 #' @importFrom Rcpp cppFunction
 #' @useDynLib tidyselect, .registration = TRUE
 "_PACKAGE"
 
 
 maybe_overtake_dplyr <- function(...) {
-  if (!is_installed("dplyr")) {
-    return(FALSE)
-  }
-
-  # Check whether dplyr already uses tidyselect
-  dplyr_contains <- ns_imports_env("dplyr")$contains
-  if (!is_null(dplyr_contains) && ns_env_name(dplyr_contains) == "tidyselect") {
+  if (!is_installed("dplyr") || utils::packageVersion("dplyr") > "99.9.0") {
     return(FALSE)
   }
 

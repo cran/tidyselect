@@ -10,8 +10,6 @@ is_data_pronoun <- function(expr) {
     identical(node_cadr(expr), quote(.data))
 }
 
-commas <- function(...) paste0(..., collapse = ", ")
-
 singular <- function(vars) {
   nm <- attr(vars, "type") %||% c("column", "columns")
   if (!is_character(nm, 2)) {
@@ -26,8 +24,30 @@ plural <- function(vars) {
   }
   nm[[2]]
 }
+Singular <- function(vars) {
+  capitalise_first(singular(vars))
+}
+Plural <- function(vars) {
+  capitalise_first(plural(vars))
+}
+
+vars_pluralise <- function(vars) {
+  pluralise(vars, singular(vars), plural(vars))
+}
+vars_pluralise_len <- function(vars, x) {
+  pluralise_len(x, singular(vars), plural(vars))
+}
+
+capitalise_first <- function(chr) {
+  gsub("(^[[:alpha:]])", "\\U\\1", chr, perl = TRUE)
+}
 
 paren_sym <- quote(`(`)
 minus_sym <- quote(`-`)
 colon_sym <- quote(`:`)
 c_sym <- quote(`c`)
+
+is_language <- is_lang
+quo_is_language <- function(quo, name = NULL, n = NULL, ns = NULL) {
+  is_language(f_rhs(quo), name = name, n = n, ns = ns)
+}
