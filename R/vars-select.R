@@ -8,7 +8,7 @@
 #' For consistency with dplyr, error messages refer to "columns" by
 #' default. This assumes that the variables being selected come from a
 #' data frame. If this is not appropriate for your DSL, you can add an
-#' attribute `vars_type` to the `.vars` vector to specify alternative
+#' attribute `type` to the `.vars` vector to specify alternative
 #' names. This must be a character vector of length 2 whose first
 #' component is the singular form and the second is the plural. For
 #' example, `c("variable", "variables")`.
@@ -211,14 +211,20 @@ is_concat_lang <- function(quo) {
 vars_select_eval <- function(vars, quos) {
   scoped_vars(vars)
 
+  # Overscope `c`, `:` and `-` with versions that handle strings
+  data_helpers <- list(`:` = vars_colon, `-` = vars_minus, `c` = vars_c)
+  overscope_top <- new_environment(data_helpers)
+
   # Symbols and calls to `:` and `c()` are evaluated with data in scope
   is_helper <- map_lgl(quos, quo_is_helper)
   data <- set_names(as.list(seq_along(vars)), vars)
+  data <- data[!names(data) == ""]
+  overscope <- env_bury(overscope_top, !!! data)
 
-  # Overscope `:` and `-` with versions that handle strings
-  data <- c(data, `:` = vars_colon, `-` = vars_minus)
+  overscope <- new_overscope(overscope, overscope_top)
+  overscope$.data <- data
 
-  ind_list <- map_if(quos, !is_helper, eval_tidy, data)
+  ind_list <- map_if(quos, !is_helper, overscope_eval_next, overscope = overscope)
 
   # All other calls are evaluated in the context only
   # They are always evaluated strictly
@@ -229,10 +235,10 @@ vars_select_eval <- function(vars, quos) {
 
 vars_colon <- function(x, y) {
   if (is_string(x)) {
-    x <- match_string(x)
+    x <- match_strings(x)
   }
   if (is_string(y)) {
-    y <- match_string(y)
+    y <- match_strings(y)
   }
 
   x:y
@@ -242,18 +248,23 @@ vars_minus <- function(x, y) {
     return(x - y)
   }
 
-  if (is_string(x)) {
-    x <- match_string(x)
+  if (is_character(x)) {
+    x <- match_strings(x)
   }
 
   -x
 }
-match_string <- function(x) {
+vars_c <- function(...) {
+  dots <- map_if(list(...), is_character, match_strings)
+  do.call(`c`, dots)
+}
+match_strings <- function(x) {
   vars <- peek_vars()
   out <- match(x, vars)
 
-  if (is_na(out)) {
-    abort(glue("Unknown { singular(vars) } `{ x }`"))
+  if (any(are_na(out))) {
+    unknown <- x[are_na(out)]
+    bad_unknown_vars(vars, unknown)
   }
 
   out
