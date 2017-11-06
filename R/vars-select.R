@@ -211,6 +211,9 @@ is_concat_lang <- function(quo) {
 vars_select_eval <- function(vars, quos) {
   scoped_vars(vars)
 
+  # Peek validated variables
+  vars <- peek_vars()
+
   # Overscope `c`, `:` and `-` with versions that handle strings
   data_helpers <- list(`:` = vars_colon, `-` = vars_minus, `c` = vars_c)
   overscope_top <- new_environment(data_helpers)
@@ -218,7 +221,6 @@ vars_select_eval <- function(vars, quos) {
   # Symbols and calls to `:` and `c()` are evaluated with data in scope
   is_helper <- map_lgl(quos, quo_is_helper)
   data <- set_names(as.list(seq_along(vars)), vars)
-  data <- data[!names(data) == ""]
   overscope <- env_bury(overscope_top, !!! data)
 
   overscope <- new_overscope(overscope, overscope_top)
@@ -229,6 +231,9 @@ vars_select_eval <- function(vars, quos) {
   # All other calls are evaluated in the context only
   # They are always evaluated strictly
   ind_list <- map_if(ind_list, is_helper, eval_tidy)
+
+  # Handle unquoted character vectors
+  ind_list <- map_if(ind_list, is_character, match_strings, names = TRUE)
 
   ind_list
 }
@@ -258,7 +263,7 @@ vars_c <- function(...) {
   dots <- map_if(list(...), is_character, match_strings)
   do.call(`c`, dots)
 }
-match_strings <- function(x) {
+match_strings <- function(x, names = FALSE) {
   vars <- peek_vars()
   out <- match(x, vars)
 
@@ -267,7 +272,11 @@ match_strings <- function(x) {
     bad_unknown_vars(vars, unknown)
   }
 
-  out
+  if (names) {
+    set_names(out, names(x))
+  } else {
+    out
+  }
 }
 
 extract_expr <- function(expr) {
