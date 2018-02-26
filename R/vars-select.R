@@ -129,7 +129,7 @@ vars_select <- function(.vars, ...,
   }
 
   # if the first selector is exclusive (negative), start with all columns
-  first <- f_rhs(quos[[1]])
+  first <- quo_get_expr(quos[[1]])
   initial_case <- if (is_negated(first)) list(seq_along(.vars)) else integer(0)
 
   ind_list <- c(initial_case, ind_list)
@@ -189,7 +189,7 @@ is_ignored <- function(quo, vars) {
 is_ignored_minus_lang <- function(quo, vars) {
   expr <- get_expr(quo)
 
-  if (!is_language(expr, quote(`-`), 1L)) {
+  if (!is_call(expr, quote(`-`), 1L)) {
     return(FALSE)
   }
 
@@ -205,7 +205,7 @@ is_unknown_symbol <- function(quo, vars) {
   !as_string(expr) %in% vars
 }
 is_concat_lang <- function(quo) {
-  quo_is_language(quo, quote(`c`))
+  quo_is_call(quo, quote(`c`))
 }
 
 vars_select_eval <- function(vars, quos) {
@@ -216,7 +216,7 @@ vars_select_eval <- function(vars, quos) {
 
   # Overscope `c`, `:` and `-` with versions that handle strings
   data_helpers <- list(`:` = vars_colon, `-` = vars_minus, `c` = vars_c)
-  overscope_top <- new_environment(data_helpers)
+  overscope_top <- as_environment(data_helpers)
 
   # Symbols and calls to `:` and `c()` are evaluated with data in scope
   is_helper <- map_lgl(quos, quo_is_helper)
@@ -281,7 +281,7 @@ match_strings <- function(x, names = FALSE) {
 
 extract_expr <- function(expr) {
   expr <- get_expr(expr)
-  while(is_lang(expr, paren_sym)) {
+  while(is_call(expr, paren_sym)) {
     expr <- get_expr(expr[[2]])
   }
   expr
@@ -290,7 +290,7 @@ extract_expr <- function(expr) {
 quo_is_helper <- function(quo) {
   expr <- extract_expr(quo)
 
-  if (!is_lang(expr)) {
+  if (!is_call(expr)) {
     return(FALSE)
   }
 
@@ -298,12 +298,12 @@ quo_is_helper <- function(quo) {
     return(FALSE)
   }
 
-  if (is_lang(expr, minus_sym, n = 1)) {
+  if (is_call(expr, minus_sym, n = 1)) {
     operand <- extract_expr(expr[[2]])
     return(quo_is_helper(operand))
   }
 
-  if (is_lang(expr, list(colon_sym, c_sym))) {
+  if (is_call(expr, list(colon_sym, c_sym))) {
     return(FALSE)
   }
 
