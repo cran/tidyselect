@@ -111,6 +111,11 @@ vars_select <- function(.vars, ...,
                         .strict = TRUE) {
   quos <- quos(...)
 
+  if (!length(quos)) {
+    signal("", "tidyselect_empty_dots")
+    return(empty_sel(.vars, .include, .exclude))
+  }
+
   if (!.strict) {
     quos <- ignore_unknown_symbols(.vars, quos)
   }
@@ -124,8 +129,8 @@ vars_select <- function(.vars, ...,
   quos <- discard(quos, is_empty)
 
   if (is_empty(ind_list)) {
-    .vars <- setdiff(.include, .exclude)
-    return(set_names(.vars, .vars))
+    signal("", "tidyselect_empty")
+    return(empty_sel(.vars, .include, .exclude))
   }
 
   # if the first selector is exclusive (negative), start with all columns
@@ -158,7 +163,7 @@ vars_select <- function(.vars, ...,
 
   # Ensure all output .vars named
   if (is_empty(sel)) {
-    cnd_signal("tidyselect_empty", .mufflable = FALSE)
+    signal("", "tidyselect_empty")
     names(sel) <- sel
   } else {
     unnamed <- names2(sel) == ""
@@ -166,6 +171,11 @@ vars_select <- function(.vars, ...,
   }
 
   sel
+}
+
+empty_sel <- function(vars, include, exclude) {
+  vars <- setdiff(include, exclude)
+  set_names(vars, vars)
 }
 
 ignore_unknown_symbols <- function(vars, quos) {
@@ -176,17 +186,17 @@ ignore_unknown_symbols <- function(vars, quos) {
 lang_ignore_unknown_symbols <- function(quo, vars) {
   expr <- get_expr(quo)
 
-  args <- lang_args(expr)
+  args <- call_args(expr)
   args <- discard(args, is_unknown_symbol, vars)
-  expr <- lang(node_car(expr), !!! args)
+  expr <- call2(node_car(expr), !!! args)
 
   set_expr(quo, expr)
 }
 
 is_ignored <- function(quo, vars) {
-  is_unknown_symbol(quo, vars) || is_ignored_minus_lang(quo, vars)
+  is_unknown_symbol(quo, vars) || is_ignored_minus_call(quo, vars)
 }
-is_ignored_minus_lang <- function(quo, vars) {
+is_ignored_minus_call <- function(quo, vars) {
   expr <- get_expr(quo)
 
   if (!is_call(expr, quote(`-`), 1L)) {
@@ -215,18 +225,18 @@ vars_select_eval <- function(vars, quos) {
   vars <- peek_vars()
 
   # Overscope `c`, `:` and `-` with versions that handle strings
-  data_helpers <- list(`:` = vars_colon, `-` = vars_minus, `c` = vars_c)
-  overscope_top <- as_environment(data_helpers)
+  data_helpers_env <- env(`:` = vars_colon, `-` = vars_minus, `c` = vars_c)
 
   # Symbols and calls to `:` and `c()` are evaluated with data in scope
   is_helper <- map_lgl(quos, quo_is_helper)
-  data <- set_names(as.list(seq_along(vars)), vars)
-  overscope <- env_bury(overscope_top, !!! data)
+  are_name <- are_name(vars)
+  data <- set_names(as.list(seq_along(vars)), vars)[!are_name]
+  data_env <- child_env(data_helpers_env, !!!data)
 
-  overscope <- new_overscope(overscope, overscope_top)
-  overscope$.data <- data
+  mask <- new_data_mask(data_env, data_helpers_env)
+  mask$.data <- as_data_pronoun(data)
 
-  ind_list <- map_if(quos, !is_helper, overscope_eval_next, overscope = overscope)
+  ind_list <- map_if(quos, !is_helper, eval_tidy, mask)
 
   # All other calls are evaluated in the context only
   # They are always evaluated strictly
@@ -312,7 +322,7 @@ quo_is_helper <- function(quo) {
 match_var <- function(chr, table) {
   pos <- match(chr, table)
   if (any(are_na(pos))) {
-    chr <- glue::collapse(chr[are_na(pos)], ", ")
+    chr <- glue::glue_collapse(chr[are_na(pos)], ", ")
     abort(glue(
       "Strings must match { singular(table) } names. \\
        Unknown { plural(table) }: { chr }"

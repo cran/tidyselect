@@ -92,7 +92,7 @@ scoped_vars <- function(vars, frame = caller_env()) {
   old <- poke_vars(vars)
 
   # Inline everything so the call will succeed in any environment
-  expr <- lang(on.exit, lang(poke_vars, old), add = TRUE)
+  expr <- call2(on.exit, call2(poke_vars, old), add = TRUE)
   eval_bare(expr, frame)
 
   invisible(old)
@@ -114,15 +114,6 @@ has_vars <- function() {
 vars_validate <- function(vars) {
   if (!is_character(vars)) {
     abort("`vars` must be a character vector")
-  }
-
-  are_name <- are_name(vars)
-  if (any(!are_name)) {
-    # Propagate `type` attribute when subsetting. A proper S3 class
-    # might be better.
-    type <- attr(vars, "type")
-    vars <- vars[!are_name]
-    attr(vars, "type") <- type
   }
 
   vars
