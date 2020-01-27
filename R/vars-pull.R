@@ -16,7 +16,7 @@
 #'
 #'   This argument is taken by expression and supports
 #'   [quasiquotation][rlang::quasiquotation] (you can unquote column
-#'   names and column positions).
+#'   names and column locations).
 #' @return The selected column name as an unnamed string.
 #' @seealso [dplyr::pull()], [vars_select()]
 #' @export
@@ -32,34 +32,38 @@
 #' var <- 10
 #' vars_pull(letters, !! var)
 vars_pull <- function(vars, var = -1) {
-  var_env <- set_names(as_list(seq_along(vars)), vars)
-  var <- eval_tidy(enquo(var), var_env)
   n <- length(vars)
 
-  # Fall degenerate values like `Inf` through integerish branch
-  if (is_double(var, 1) && !is.finite(var)) {
-    var <- na_int
+  instrument_base_errors(
+    loc <- eval_tidy(enquo(var), set_names(seq_along(vars), vars))
+  )
+  loc <- pull_as_location2(loc, n, vars)
+
+  if (loc < 0L) {
+    loc <- n + 1L + loc
   }
 
-  if (is_string(var)) {
-    pos <- match_var(var, vars)
-  } else if (is_integerish(var, 1)) {
-    if (is_na(var) || abs(var) > n || var == 0L) {
-      abort(glue(
-        "`var` must be a value between {-n} and {n} (excluding zero), not {var}"
-      ))
-    }
-    if (var < 0) {
-      pos <- var + n + 1
+  vars[[loc]]
+}
+
+pull_as_location2 <- function(i, n, names) {
+  with_subscript_errors(type = "pull", {
+    i <- vctrs::vec_as_subscript2(i, arg = "var", logical = "error")
+
+    if (is.numeric(i)) {
+      vctrs::num_as_location2(
+        i,
+        n = n,
+        negative = "ignore",
+        arg = "var"
+      )
     } else {
-      pos <- var
+      vctrs::vec_as_location2(
+        i,
+        n = n,
+        names = names,
+        arg = "var"
+      )
     }
-  } else {
-    type <- friendly_type(type_of(var))
-    abort(glue(
-      "`var` must evaluate to a single number or a { singular(vars) } name, not {type}"
-    ))
-  }
-
-  vars[[pos]]
+  })
 }

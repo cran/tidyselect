@@ -1,8 +1,8 @@
 #' @import rlang
 #' @importFrom glue glue
 #' @importFrom purrr discard map map_chr map_if map_lgl map2 map2_chr
-#' @importFrom Rcpp cppFunction
-#' @useDynLib tidyselect, .registration = TRUE
+#'   detect_index negate walk every compact
+#' @keywords internal
 "_PACKAGE"
 
 
@@ -40,16 +40,4 @@ hotpatch_binding <- function(binding, fn, env) {
 .onLoad <- function(...) {
   maybe_hotpatch_dplyr()
   setHook(packageEvent("dplyr", "onLoad"), maybe_hotpatch_dplyr)
-
-  local(envir = ns_env("tidyselect"), {
-    delayedAssign("signal", {
-      if (utils::packageVersion("rlang") < "0.2.99") {
-        function(message, .subclass) {
-          cnd_signal(.subclass)
-        }
-      } else {
-        env_get(ns_env("rlang"), "signal")
-      }
-    })
-  })
 }

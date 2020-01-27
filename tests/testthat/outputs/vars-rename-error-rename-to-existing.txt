@@ -1,0 +1,12 @@
+> # One column
+> vars_rename(c("a", "b", "c"), b = a)
+Error: Names must be unique.
+
+> # Multiple columns
+> vars_rename(c("a", "b", "c", "d"), c = a, d = b)
+Error: Names must be unique.
+
+> # Overlapping rename with one duplicate column
+> vars_rename(c("a", "b", "c"), b = a, c = b)
+Error: Names must be unique.
+

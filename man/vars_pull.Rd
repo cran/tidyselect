@@ -7,6 +7,8 @@
 vars_pull(vars, var = -1)
 }
 \arguments{
+\item{vars}{A character vector of existing column names.}
+
 \item{var}{A variable specified as:
 \itemize{
 \item a literal variable name
@@ -19,7 +21,7 @@ column you've created most recently).
 
 This argument is taken by expression and supports
 \link[rlang:quasiquotation]{quasiquotation} (you can unquote column
-names and column positions).}
+names and column locations).}
 }
 \value{
 The selected column name as an unnamed string.

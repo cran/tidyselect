@@ -2,15 +2,12 @@
 % Please edit documentation in R/vars.R
 \name{poke_vars}
 \alias{poke_vars}
-\alias{peek_vars}
 \alias{scoped_vars}
 \alias{with_vars}
 \alias{has_vars}
 \title{Replace or get current variables}
 \usage{
 poke_vars(vars)
-
-peek_vars()
 
 scoped_vars(vars, frame = caller_env())
 
@@ -55,7 +52,7 @@ poke_vars(letters)
 peek_vars()
 
 # Now that the variables are registered, the helpers can figure out
-# the positions of elements within the variable vector:
+# the locations of elements within the variable vector:
 one_of(c("d", "z"))
 
 # In a function be sure to restore the previous variables. An exit
@@ -92,3 +89,7 @@ fn <- function(expr) {
 }
 fn(starts_with("r"))
 }
+\seealso{
+peek_vars
+}
+\keyword{internal}
