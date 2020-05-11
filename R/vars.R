@@ -42,7 +42,7 @@ peeker <- function(what) {
 #' The variable names in a selection context are registered
 #' automatically by [eval_select()] and [eval_rename()] for the
 #' duration of the evaluation. `peek_vars()` is the glue that connects
-#' [selection helpers][select_helpers] to the current selection
+#' [selection helpers][language] to the current selection
 #' context.
 #'
 #' @inheritParams ellipsis::dots_empty
@@ -60,7 +60,7 @@ peek_data <- peeker("data")
 #'
 #' @description
 #'
-#' Variables are made available to [select helpers][select_helpers] by
+#' Variables are made available to [select helpers][language] by
 #' registering them in a special placeholder.
 #'
 #' * `scoped_vars()` changes the current variables and sets up a
@@ -95,7 +95,7 @@ peek_data <- peeker("data")
 #'
 #' # Now that the variables are registered, the helpers can figure out
 #' # the locations of elements within the variable vector:
-#' one_of(c("d", "z"))
+#' all_of(c("d", "z"))
 #'
 #' # In a function be sure to restore the previous variables. An exit
 #' # hook is the best way to do it:
@@ -103,7 +103,7 @@ peek_data <- peeker("data")
 #'   old <- poke_vars(vars)
 #'   on.exit(poke_vars(old))
 #'
-#'   one_of("d")
+#'   all_of("d")
 #' }
 #' fn(letters)
 #' fn(letters[3:5])

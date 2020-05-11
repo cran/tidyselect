@@ -5,15 +5,21 @@ vars_select_eval <- function(vars,
                              data = NULL,
                              name_spec = NULL,
                              uniquely_named = NULL,
+                             allow_rename = TRUE,
                              type = "select") {
   wrapped <- quo_get_expr2(expr, expr)
 
   if (is_missing(wrapped)) {
     return(named(int()))
   }
+
+  uniquely_named <- uniquely_named %||% is.data.frame(data)
+
   if (!is_symbolic(wrapped)) {
     pos <- as_indices_sel_impl(wrapped, vars = vars, strict = strict, data = data)
-    return(loc_validate(pos, vars))
+    pos <- loc_validate(pos, vars)
+    pos <- ensure_named(pos, vars, uniquely_named, allow_rename)
+    return(pos)
   }
 
   vars <- peek_vars()
@@ -22,7 +28,6 @@ vars_select_eval <- function(vars,
 
   # Mark data duplicates so we can fail instead of disambiguating them
   # when renaming
-  uniquely_named <- uniquely_named %||% is.data.frame(data)
   if (uniquely_named) {
     vars_split$val <- map(vars_split$val, mark_data_dups)
   }
@@ -62,7 +67,17 @@ vars_select_eval <- function(vars,
     abort("All renaming inputs must be named.")
   }
 
-  # Ensure position vector is fully named
+  ensure_named(pos, vars, uniquely_named, allow_rename)
+}
+
+ensure_named <- function(pos, vars, uniquely_named, allow_rename) {
+  if (!allow_rename) {
+    if (is_named(pos)) {
+      abort("Can't rename variables in this context.")
+    }
+    return(set_names(pos, NULL))
+  }
+
   nms <- names(pos) <- names2(pos)
   nms_missing <- nms == ""
   names(pos)[nms_missing] <- vars[pos[nms_missing]]
@@ -108,6 +123,7 @@ walk_data_tree <- function(expr, data_mask, context_mask, colon = FALSE) {
     `*` = stop_bad_arith_op("*"),
     `/` = eval_slash(expr, data_mask, context_mask),
     `^` = stop_bad_arith_op("^"),
+    `~` = stop_formula(expr),
     .data = eval(expr, data_mask),
     eval_context(expr, context_mask)
   )
@@ -203,6 +219,7 @@ call_kind <- function(expr) {
     `*` = ,
     `/` = ,
     `^` = ,
+    `~` = ,
     `c` = fn,
     "call"
   )
@@ -269,7 +286,30 @@ eval_sym <- function(expr, data_mask, context_mask, strict = FALSE) {
     return(name)
   }
 
+  # Predicate functions must now be wrapped in `where()`. We'll
+  # support functions starting with `is` for compatibility for
+  # compatibility.
   if (is_function(value)) {
+    if (!grepl("^is", name)) {
+      return(name)
+    }
+
+    if (!is_string(verbosity(), "quiet")) {
+      msg <- paste_line(c(
+        "Predicate functions must be wrapped in `where()`.",
+        "",
+        "  # Bad",
+        glue::glue("  data %>% select({name})"),
+        "",
+        "  # Good",
+        glue::glue("  data %>% select(where({name}))"),
+        ""
+      ))
+      bullet <- format_error_bullets(c(i = "Please update your code."))
+
+      warn_once(paste_line(msg, bullet))
+    }
+
     return(value)
   }
 
@@ -278,7 +318,9 @@ eval_sym <- function(expr, data_mask, context_mask, strict = FALSE) {
     return(name)
   }
 
-  if (needs_advice(env)) {
+  verbosity <- verbosity()
+
+  if (!is_string(verbosity, "quiet") && env_needs_advice(env)) {
     # Please keep in sync with faq.R.
     msg <- glue_c(
       "Note: Using an external vector in selections is ambiguous.",
@@ -286,7 +328,12 @@ eval_sym <- function(expr, data_mask, context_mask, strict = FALSE) {
       i = "See <https://tidyselect.r-lib.org/reference/faq-external-vector.html>."
     )
     id <- paste0("strict_lookup_", name)
-    inform_once(msg, id)
+
+    if (is_string(verbosity, "verbose")) {
+      inform(msg)
+    } else {
+      inform_once(msg, id)
+    }
   }
 
   value

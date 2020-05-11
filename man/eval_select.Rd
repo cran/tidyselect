@@ -22,7 +22,8 @@ eval_select(
   include = NULL,
   exclude = NULL,
   strict = TRUE,
-  name_spec = NULL
+  name_spec = NULL,
+  allow_rename = TRUE
 )
 }
 \arguments{
@@ -50,6 +51,10 @@ valid name specs.}
 
 \item{include, exclude}{Character vector of column names to always
 include or exclude from the selection.}
+
+\item{allow_rename}{If \code{TRUE} (the default), the renaming syntax
+\code{c(foo = bar)} is allowed. If \code{FALSE}, it causes an error. This
+is useful to implement purely selective behaviour.}
 }
 \value{
 A named vector of numeric locations, one for each of the
@@ -94,6 +99,27 @@ eval_select(x, mtcars)
 # be named within `c()`:
 try(eval_rename(expr(mpg), mtcars))
 eval_rename(expr(c(foo = mpg)), mtcars)
+
+
+# Within a function, use `enquo()` to defuse one argument:
+my_function <- function(x, expr) {
+  eval_select(enquo(expr), x)
+}
+
+# If your function takes dots, evaluate a defused call to `c(...)`
+# with `expr(c(...))`:
+my_function <- function(.x, ...) {
+  eval_select(expr(c(...)), .x)
+}
+
+# If your function takes dots and a named argument, use `{{ }}`
+# inside the defused expression to tunnel it inside the tidyselect DSL:
+my_function <- function(.x, .expr, ...) {
+  eval_select(expr(c({{ .expr }}, ...)), .x)
+}
+
+# Note that the trick above works because `expr({{ arg }})` is the
+# same as `enquo(arg)`.
 
 
 # The evaluators return a named vector of locations. Here are

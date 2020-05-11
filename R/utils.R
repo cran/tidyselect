@@ -274,14 +274,15 @@ named <- function(x) {
   set_names(x, names2(x))
 }
 
-inform_env <- env()
-inform_once <- function(msg, id = msg) {
+signal_env <- env()
+
+signal_once <- function(signal, msg, id) {
   stopifnot(is_string(id))
 
-  if (env_has(inform_env, id)) {
+  if (env_has(signal_env, id)) {
     return(invisible(NULL))
   }
-  inform_env[[id]] <- TRUE
+  signal_env[[id]] <- TRUE
 
   issue <- msg[[1]]
   bullets <- msg[-1]
@@ -292,21 +293,34 @@ inform_once <- function(msg, id = msg) {
     msg <- paste_line(msg, bullets)
   }
 
-  inform(paste_line(
+  signal(paste_line(
     msg, silver("This message is displayed once per session.")
   ))
 }
+inform_once <- function(msg, id = msg) {
+  signal_once(inform, msg, id)
+}
+warn_once <- function(msg, id = msg) {
+  signal_once(warn, msg, id)
+}
 
-needs_advice <- function(env) {
-  opt <- peek_option("tidyselect_verbosity")
-  if (is_string(opt)) {
-    return(switch(opt,
-      quiet = FALSE,
-      verbose = TRUE,
-      abort("`tidyselect_verbosity` must be `\"quiet\"` or `\"verbose\"`.")
+verbosity <- function(default = "default") {
+  opt <- peek_option("tidyselect_verbosity") %||% default
+
+  if (!is_string(opt, c("default", "quiet", "verbose"))) {
+    options(tidyselect_verbosity = NULL)
+    warn(c(
+      "`tidyselect_verbosity` must be `\"quiet\"` or `\"verbose\"`.",
+      i = "Resetting to NULL."
     ))
+
+    opt <- default
   }
 
+  opt
+}
+
+env_needs_advice <- function(env) {
   if (is_reference(topenv(env), global_env())) {
     return(TRUE)
   }
@@ -329,3 +343,8 @@ has_crayon <- function() {
   is_installed("crayon") && crayon::has_color()
 }
 silver <- function(x) if (has_crayon()) crayon::silver(x) else x
+
+glue_line <- function(..., env = parent.frame()) {
+  out <- map_chr(chr(...), glue::glue, .envir = env)
+  paste(out, collapse = "\n")
+}

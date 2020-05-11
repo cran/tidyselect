@@ -30,7 +30,7 @@ invisibly. For \code{peek_vars()}, the variables currently
 registered.
 }
 \description{
-Variables are made available to \link[=select_helpers]{select helpers} by
+Variables are made available to \link[=language]{select helpers} by
 registering them in a special placeholder.
 \itemize{
 \item \code{scoped_vars()} changes the current variables and sets up a
@@ -53,7 +53,7 @@ peek_vars()
 
 # Now that the variables are registered, the helpers can figure out
 # the locations of elements within the variable vector:
-one_of(c("d", "z"))
+all_of(c("d", "z"))
 
 # In a function be sure to restore the previous variables. An exit
 # hook is the best way to do it:
@@ -61,7 +61,7 @@ fn <- function(vars) {
   old <- poke_vars(vars)
   on.exit(poke_vars(old))
 
-  one_of("d")
+  all_of("d")
 }
 fn(letters)
 fn(letters[3:5])
