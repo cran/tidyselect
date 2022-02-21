@@ -1,5 +1,3 @@
-context("pull var")
-
 test_that("errors for bad inputs", {
   expect_error(
     vars_pull(letters, letters),
@@ -52,7 +50,7 @@ test_that("errors for bad inputs", {
     class = "vctrs_error_subscript_type"
   )
 
-  verify_output(test_path("outputs", "vars-pull-input-checking.txt"), {
+  expect_snapshot(error = TRUE, {
     vars_pull(letters, letters)
     vars_pull(letters, aa)
     vars_pull(letters, 0)
@@ -88,15 +86,30 @@ test_that("can pull with negative values", {
   expect_identical(vars_pull(letters, -3), "x")
 })
 
-test_that("vars_pull() instruments base errors", {
-  verify_errors({
-    expect_error(vars_pull(letters, foobar), "")
+test_that("vars_pull() has informative errors", {
+  expect_snapshot({
+    "# vars_pull() instruments base errors"
+    (expect_error(vars_pull(letters, foobar), ""))
   })
 })
 
-test_that("vars_pull() has informative errors", {
-  verify_output(test_path("error", "test-vars-pull.txt"), {
-    "# vars_pull() instruments base errors"
-    vars_pull(letters, foobar)
+test_that("vars_pull() errors mention correct calls", {
+  f <- function() stop("foo")
+  expect_snapshot((expect_error(vars_pull(letters, f()))))
+})
+
+test_that("vars_pull() produces correct backtraces", {
+  f <- function(base) g(base)
+  g <- function(base) h(base)
+  h <- function(base) if (base) stop("foo") else abort("foo")
+
+  local_options(
+    rlang_trace_trop_env = current_env(),
+    rlang_trace_format_srcrefs = FALSE
+  )
+
+  expect_snapshot({
+    print(expect_error(vars_pull(letters, f(base = TRUE))))
+    print(expect_error(vars_pull(letters, f(base = FALSE))))
   })
 })

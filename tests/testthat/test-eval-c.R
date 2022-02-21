@@ -1,4 +1,3 @@
-
 test_that("c() interpolates union and setdiff operations (#130)", {
   expect_identical(select_loc(mtcars, c(mpg:disp, -(mpg:cyl))), c(disp = 3L))
 
@@ -60,7 +59,7 @@ test_that("uniquely-named inputs can't rename duplicates", {
   expect_error(select_loc(df, c(foo = a)), "rename duplicate")
   expect_identical(select_loc(unclass(df), c(foo = a)), c(foo = 1L, foo = 3L))
 
-  verify_output(test_path("outputs", "c-rename-duplicates.txt"), {
+  expect_snapshot(error = TRUE, {
     names(df)
     select_loc(df, c(foo = a))
   })

@@ -1,4 +1,3 @@
-
 test_that("can refer to columns in | operands", {
   expect_identical(select_loc(mtcars, cyl | am), c(cyl = 2L, am = 9L))
 })
@@ -37,7 +36,7 @@ test_that("boolean operators throw relevant errors", {
     "empty selection"
   )
 
-  verify_output(test_path("outputs", "select-eval-boolean-errors.txt"), {
+  expect_snapshot(error = TRUE, {
     "Unknown names"
     select_loc(mtcars, foobar & contains("am"))
     select_loc(mtcars, contains("am") | foobar)
