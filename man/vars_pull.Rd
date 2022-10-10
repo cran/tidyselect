@@ -4,7 +4,12 @@
 \alias{vars_pull}
 \title{Select variable}
 \usage{
-vars_pull(vars, var = -1)
+vars_pull(
+  vars,
+  var = -1,
+  error_call = caller_env(),
+  error_arg = caller_arg(var)
+)
 }
 \arguments{
 \item{vars}{A character vector of existing column names.}
@@ -22,6 +27,15 @@ column you've created most recently).
 This argument is taken by expression and supports
 \link[rlang:topic-inject]{quasiquotation} (you can unquote column
 names and column locations).}
+
+\item{error_call}{The execution environment of a currently
+running function, e.g. \code{caller_env()}. The function will be
+mentioned in error messages as the source of the error. See the
+\code{call} argument of \code{\link[rlang:abort]{abort()}} for more information.}
+
+\item{error_arg}{An argument name as a string. This argument
+will be mentioned in error messages as the input that is at the
+origin of a problem.}
 }
 \value{
 The selected column name as an unnamed string.
@@ -41,7 +55,7 @@ vars_pull(letters, -3)
 
 # You can unquote variables:
 var <- 10
-vars_pull(letters, !! var)
+vars_pull(letters, !!var)
 }
 \seealso{
 \code{\link[dplyr:pull]{dplyr::pull()}}, \code{\link[=vars_select]{vars_select()}}

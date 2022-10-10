@@ -16,11 +16,15 @@ contains(match, ignore.case = TRUE, vars = NULL)
 
 matches(match, ignore.case = TRUE, perl = FALSE, vars = NULL)
 
-num_range(prefix, range, width = NULL, vars = NULL)
+num_range(prefix, range, suffix = "", width = NULL, vars = NULL)
 }
 \arguments{
 \item{match}{A character vector. If length > 1, the union of the
-matches is taken.}
+matches is taken.
+
+For \code{starts_with()}, \code{ends_with()}, and \code{contains()} this is an exact
+match. For \code{matches()} this is a regular expression, and can be a
+stringr pattern.}
 
 \item{ignore.case}{If \code{TRUE}, the default, ignores case when matching
 names.}
@@ -31,7 +35,7 @@ established by functions like \code{select()} or \code{pivot_longer()}).}
 
 \item{perl}{Should Perl-compatible regexps be used?}
 
-\item{prefix}{A prefix that starts the numeric range.}
+\item{prefix, suffix}{A prefix/suffix added before/after the numeric range.}
 
 \item{range}{A sequence of integers, like \code{1:5}.}
 
@@ -42,8 +46,8 @@ a range of 2 gives "01", a range of three "001", etc.}
 These \link[=language]{selection helpers} match variables according
 to a given pattern.
 \itemize{
-\item \code{\link[=starts_with]{starts_with()}}: Starts with a prefix.
-\item \code{\link[=ends_with]{ends_with()}}: Ends with a suffix.
+\item \code{\link[=starts_with]{starts_with()}}: Starts with an exact prefix.
+\item \code{\link[=ends_with]{ends_with()}}: Ends with an exact suffix.
 \item \code{\link[=contains]{contains()}}: Contains a literal string.
 \item \code{\link[=matches]{matches()}}: Matches a regular expression.
 \item \code{\link[=num_range]{num_range()}}: Matches a numerical range like x01, x02, x03.
@@ -53,14 +57,18 @@ to a given pattern.
 
 
 Selection helpers can be used in functions like \code{dplyr::select()}
-or \code{tidyr::pivot_longer()}. Let's first attach the tidyverse:\if{html}{\out{<div class="sourceCode r">}}\preformatted{library(tidyverse)
+or \code{tidyr::pivot_longer()}. Let's first attach the tidyverse:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{library(tidyverse)
 
 # For better printing
 iris <- as_tibble(iris)
 }\if{html}{\out{</div>}}
 
 \code{starts_with()} selects all variables matching a prefix and
-\code{ends_with()} matches a suffix:\if{html}{\out{<div class="sourceCode r">}}\preformatted{iris \%>\% select(starts_with("Sepal"))
+\code{ends_with()} matches a suffix:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{iris \%>\% select(starts_with("Sepal"))
 #> # A tibble: 150 x 2
 #>   Sepal.Length Sepal.Width
 #>          <dbl>       <dbl>
@@ -82,7 +90,9 @@ iris \%>\% select(ends_with("Width"))
 }\if{html}{\out{</div>}}
 
 You can supply multiple prefixes or suffixes. Note how the order of
-variables depends on the order of the suffixes and prefixes:\if{html}{\out{<div class="sourceCode r">}}\preformatted{iris \%>\% select(starts_with(c("Petal", "Sepal")))
+variables depends on the order of the suffixes and prefixes:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{iris \%>\% select(starts_with(c("Petal", "Sepal")))
 #> # A tibble: 150 x 4
 #>   Petal.Length Petal.Width Sepal.Length Sepal.Width
 #>          <dbl>       <dbl>        <dbl>       <dbl>
@@ -103,7 +113,9 @@ iris \%>\% select(ends_with(c("Width", "Length")))
 #> # ... with 146 more rows
 }\if{html}{\out{</div>}}
 
-\code{contains()} selects columns whose names contain a word:\if{html}{\out{<div class="sourceCode r">}}\preformatted{iris \%>\% select(contains("al"))
+\code{contains()} selects columns whose names contain a word:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{iris \%>\% select(contains("al"))
 #> # A tibble: 150 x 4
 #>   Sepal.Length Sepal.Width Petal.Length Petal.Width
 #>          <dbl>       <dbl>        <dbl>       <dbl>
@@ -114,8 +126,10 @@ iris \%>\% select(ends_with(c("Width", "Length")))
 #> # ... with 146 more rows
 }\if{html}{\out{</div>}}
 
-These helpers do not use regular expressions. To select with a
-regexp use \code{matches()}\if{html}{\out{<div class="sourceCode r">}}\preformatted{# [pt] is matched literally:
+\code{starts_with()}, \code{ends_with()}, and \code{contains()} do not use regular expressions. To select with a
+regexp use \code{matches()}:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{# [pt] is matched literally:
 iris \%>\% select(contains("[pt]al"))
 #> # A tibble: 150 x 0
 
@@ -132,7 +146,9 @@ iris \%>\% select(matches("[pt]al"))
 }\if{html}{\out{</div>}}
 
 \code{starts_with()} selects all variables starting with a prefix. To
-select a range, use \code{num_range()}. Compare:\if{html}{\out{<div class="sourceCode r">}}\preformatted{billboard \%>\% select(starts_with("wk"))
+select a range, use \code{num_range()}. Compare:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{billboard \%>\% select(starts_with("wk"))
 #> # A tibble: 317 x 76
 #>     wk1   wk2   wk3   wk4   wk5   wk6   wk7   wk8   wk9  wk10  wk11  wk12  wk13
 #>   <dbl> <dbl> <dbl> <dbl> <dbl> <dbl> <dbl> <dbl> <dbl> <dbl> <dbl> <dbl> <dbl>

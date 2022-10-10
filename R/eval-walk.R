@@ -5,12 +5,16 @@ vars_select_eval <- function(vars,
                              name_spec = NULL,
                              uniquely_named = NULL,
                              allow_rename = TRUE,
+                             allow_empty = TRUE,
+                             allow_predicates = TRUE,
                              type = "select",
                              error_call) {
   wrapped <- quo_get_expr2(expr, expr)
 
   if (is_missing(wrapped)) {
-    return(named(int()))
+    pos <- named(int())
+    check_empty(pos, allow_empty, call = error_call)
+    return(pos)
   }
 
   uniquely_named <- uniquely_named %||% is.data.frame(data)
@@ -21,14 +25,16 @@ vars_select_eval <- function(vars,
       vars = vars,
       strict = strict,
       data = data,
+      allow_predicates = allow_predicates,
       call = error_call
     )
     pos <- loc_validate(pos, vars)
     pos <- ensure_named(
       pos,
       vars,
-      uniquely_named,
-      allow_rename,
+      uniquely_named = uniquely_named,
+      allow_rename = allow_rename,
+      allow_empty = allow_empty,
       call = error_call
     )
     return(pos)
@@ -69,36 +75,42 @@ vars_select_eval <- function(vars,
     strict = strict,
     name_spec = name_spec,
     uniquely_named = uniquely_named,
+    allow_predicates = allow_predicates,
     error_call = error_call
   )
   data_mask$.__tidyselect__.$internal <- internal
 
-  pos <- walk_data_tree(expr, data_mask, context_mask, error_call)
+  pos <- walk_data_tree(expr, data_mask, context_mask)
   pos <- loc_validate(pos, vars, call = error_call)
 
   if (type == "rename" && !is_named(pos)) {
-    abort("All renaming inputs must be named.", call = error_call)
+    cli::cli_abort("All renaming inputs must be named.", call = error_call)
   }
 
   ensure_named(
     pos,
     vars,
-    uniquely_named,
-    allow_rename,
+    uniquely_named = uniquely_named,
+    allow_rename = allow_rename,
+    allow_empty = allow_empty,
     call = error_call
   )
 }
 
 ensure_named <- function(pos,
                          vars,
-                         uniquely_named,
-                         allow_rename,
-                         call) {
-  if (!allow_rename) {
-    if (is_named(pos)) {
-      abort("Can't rename variables in this context.", call = call)
-    }
-    return(set_names(pos, NULL))
+                         uniquely_named = FALSE,
+                         allow_rename = TRUE,
+                         allow_empty = TRUE,
+                         call = caller_env()) {
+  check_empty(pos, allow_empty, call = call)
+
+  if (!allow_rename && any(names2(pos) != "")) {
+    cli::cli_abort(
+      "Can't rename variables in this context.",
+      class = "tidyselect:::error_disallowed_rename",
+      call = call
+    )
   }
 
   nms <- names(pos) <- names2(pos)
@@ -107,10 +119,16 @@ ensure_named <- function(pos,
 
   # Duplicates are not allowed for data frames
   if (uniquely_named) {
-    vctrs::vec_as_names(names(pos), repair = "check_unique")
+    vctrs::vec_as_names(names(pos), repair = "check_unique", call = call)
   }
 
   pos
+}
+
+check_empty <- function(x, allow_empty = TRUE, call = caller_env()) {
+  if (!allow_empty && length(x) == 0) {
+    cli::cli_abort("Must select at least one item.", call = call)
+  }
 }
 
 # `walk_data_tree()` is a recursive interpreter that implements a
@@ -134,12 +152,12 @@ walk_data_tree <- function(expr, data_mask, context_mask, colon = FALSE) {
   error_call <- data_mask$.__tidyselect__.$internal$error_call
 
   out <- switch(
-    expr_kind(expr, error_call),
+    expr_kind(expr, context_mask, error_call),
     literal = expr,
     symbol = eval_sym(expr, data_mask, context_mask),
     `(` = walk_data_tree(expr[[2]], data_mask, context_mask, colon = colon),
     `!` = eval_bang(expr, data_mask, context_mask),
-    `-` = eval_minus(expr, data_mask, context_mask),
+    `-` = eval_minus(expr, data_mask, context_mask, error_call),
     `:` = eval_colon(expr, data_mask, context_mask),
     `|` = eval_or(expr, data_mask, context_mask),
     `&` = eval_and(expr, data_mask, context_mask),
@@ -151,44 +169,82 @@ walk_data_tree <- function(expr, data_mask, context_mask, colon = FALSE) {
     `^` = stop_bad_arith_op("^", call = error_call),
     `~` = stop_formula(expr, call = error_call),
     .data = eval(expr, data_mask),
-    eval_context(expr, context_mask)
+    eval_context(expr, context_mask, call = error_call)
   )
 
   vars <- data_mask$.__tidyselect__.$internal$vars
   strict <- data_mask$.__tidyselect__.$internal$strict
   data <- data_mask$.__tidyselect__.$internal$data
+  allow_predicates <- data_mask$.__tidyselect__.$internal$allow_predicates
 
   as_indices_sel_impl(
     out,
     vars = vars,
     strict = strict,
     data = data,
-    call = error_call
+    allow_predicates = allow_predicates,
+    call = error_call,
+    arg = as_label(expr)
   )
 }
 
-as_indices_sel_impl <- function(x, vars, strict, data = NULL, call) {
+as_indices_sel_impl <- function(x,
+                                vars,
+                                strict,
+                                data = NULL,
+                                allow_predicates = TRUE,
+                                call,
+                                arg = NULL) {
   if (is.function(x)) {
-    if (is_null(data)) {
-      msg <- c(
-        "This tidyselect interface doesn't support predicates yet.",
-        i = "Contact the package author and suggest using `eval_select()`."
+    if (!allow_predicates) {
+      cli::cli_abort(
+        "This tidyselect interface doesn't support predicates.",
+        call = call,
+        class = "tidyselect_error_predicates_unsupported"
       )
-      abort(msg, call = call)
+    }
+    if (is_null(data)) {
+      cli::cli_abort(
+        c(
+          "This tidyselect interface doesn't support predicates yet.",
+          i = "Contact the package author and suggest using {.code eval_select()}."
+        ),
+        call = call
+      )
     }
     predicate <- x
-    x <- which(map_lgl(data, predicate))
+
+    xs <- map(data, predicate)
+    for (i in seq_along(xs)) {
+      check_predicate_output(xs[[i]], call = call)
+    }
+
+    x <- which(as.logical(xs))
   }
 
-  as_indices_impl(x, vars, call = call, strict = strict)
+  as_indices_impl(x, vars, call = call, arg = arg, strict = strict)
 }
 
-as_indices_impl <- function(x, vars, strict, call = caller_env()) {
+check_predicate_output <- function(x, call) {
+  if (!is_bool(x)) {
+    cli::cli_abort(
+      "Predicate must return `TRUE` or `FALSE`, not {obj_type_friendly(x)}.",
+      call = call
+    )
+  }
+}
+
+as_indices_impl <- function(x, vars, strict, call = caller_env(), arg = NULL) {
   if (is_null(x)) {
     return(int())
   }
 
-  x <- vctrs::vec_as_subscript(x, logical = "error")
+  x <- vctrs::vec_as_subscript(
+    x,
+    logical = "error",
+    call = call,
+    arg = arg
+  )
 
   if (!strict) {
     # Remove out-of-bounds elements if non-strict. We do this eagerly
@@ -203,18 +259,20 @@ as_indices_impl <- function(x, vars, strict, call = caller_env()) {
 
   switch(
     typeof(x),
-    character = chr_as_locations(x, vars, call = call),
+    character = chr_as_locations(x, vars, call = call, arg = arg),
     double = ,
     integer = x,
-    abort("Unexpected type.", .internal = TRUE)
+    cli::cli_abort("Unexpected type.", .internal = TRUE)
   )
 }
 
-chr_as_locations <- function(x, vars, call = caller_env()) {
+chr_as_locations <- function(x, vars, call = caller_env(), arg = NULL) {
   out <- vctrs::vec_as_location(
     x,
     n = length(vars),
-    names = vars
+    names = vars,
+    call = call,
+    arg = arg
   )
   set_names(out, names(x))
 }
@@ -224,24 +282,44 @@ as_indices <- function(x, vars, strict = TRUE, call) {
   vctrs::vec_as_location(inds, length(vars), vars, convert_values = NULL)
 }
 
-expr_kind <- function(expr, error_call) {
+expr_kind <- function(expr, context_mask, error_call) {
   switch(
     typeof(expr),
     symbol = "symbol",
-    language = call_kind(expr, error_call),
+    language = call_kind(expr, context_mask, error_call),
     "literal"
   )
 }
-call_kind <- function(expr, error_call) {
+call_kind <- function(expr, context_mask, error_call) {
   head <- node_car(expr)
   if (!is_symbol(head)) {
     return("call")
   }
 
+  env <- context_mask$.__current__.
+
   fn <- as_string(head)
 
-  if (fn %in% c("$", "[[") && identical(node_cadr(expr), quote(.data))) {
+  if (fn %in% c("$", "[[") && identical(expr[[2]], quote(.data))) {
     validate_dot_data(expr, error_call)
+
+    what <- I("Use of .data in tidyselect expressions")
+    if (fn == "$") {
+      var <- as_string(expr[[3]])
+      str <- encodeString(var, quote = '"')
+
+      lifecycle::deprecate_soft("1.2.0", what,
+        details = cli::format_inline("Please use {.code {str}} instead of `.data${var}`"),
+        user_env = env
+      )
+    } else if (fn == "[[") {
+      # .data[[ is an injection operator so can't give specific advice
+      lifecycle::deprecate_soft("1.2.0", what,
+        details = cli::format_inline("Please use {.code all_of(var)} (or {.code any_of(var)}) instead of {.code .data[[var]]}"),
+        user_env = env
+      )
+    }
+
     return(".data")
   }
 
@@ -278,11 +356,11 @@ eval_colon <- function(expr, data_mask, context_mask) {
   }
 }
 
-eval_minus <- function(expr, data_mask, context_mask) {
+eval_minus <- function(expr, data_mask, context_mask, call = call) {
   if (length(expr) == 2) {
     eval_bang(expr, data_mask, context_mask)
   } else {
-    eval_context(expr, context_mask)
+    eval_context(expr, context_mask, call = call)
   }
 }
 
@@ -296,10 +374,13 @@ eval_slash <- function(expr, data_mask, context_mask) {
   sel_diff(lhs, rhs, vars, error_call = error_call)
 }
 
-eval_context <- function(expr, context_mask) {
+eval_context <- function(expr, context_mask, call) {
   env <- context_mask$.__current__. %||% base_env()
-  expr <- as_quosure(expr, env)
-  eval_tidy(expr, context_mask)
+  with_chained_errors(
+    eval_tidy(as_quosure(expr, env), context_mask),
+    call = call,
+    eval_expr = expr
+  )
 }
 
 eval_sym <- function(expr, data_mask, context_mask, strict = FALSE) {
@@ -336,21 +417,19 @@ eval_sym <- function(expr, data_mask, context_mask, strict = FALSE) {
       return(name)
     }
 
-    if (!is_string(verbosity(), "quiet")) {
-      msg <- paste_line(c(
-        "Predicate functions must be wrapped in `where()`.",
+    # Formally deprecated in 1.2.0
+    lifecycle::deprecate_soft("1.1.0",
+      what = I("Use of bare predicate functions"),
+      with = I("wrap predicates in `where()`"),
+      details = c(
+        " " = "# Was:",
+        " " = glue("data %>% select({name})"),
         "",
-        "  # Bad",
-        glue::glue("  data %>% select({name})"),
-        "",
-        "  # Good",
-        glue::glue("  data %>% select(where({name}))"),
-        ""
-      ))
-      bullet <- format_error_bullets(c(i = "Please update your code."))
-
-      warn_once(paste_line(msg, bullet))
-    }
+        " " = "# Now:",
+        " " = glue("data %>% select(where({name}))")
+      ),
+      user_env = env
+    )
 
     return(value)
   }
@@ -360,33 +439,37 @@ eval_sym <- function(expr, data_mask, context_mask, strict = FALSE) {
     return(name)
   }
 
-  verbosity <- verbosity()
-
-  if (!is_string(verbosity, "quiet") && env_needs_advice(env)) {
-    # Please keep in sync with faq.R.
-    msg <- glue_c(
-      "Note: Using an external vector in selections is ambiguous.",
-      i = "Use `all_of({name})` instead of `{name}` to silence this message.",
-      i = "See <https://tidyselect.r-lib.org/reference/faq-external-vector.html>."
-    )
-    id <- paste0("strict_lookup_", name)
-
-    if (is_string(verbosity, "verbose")) {
-      inform(msg)
-    } else {
-      inform_once(msg, id)
-    }
-  }
+  # Formally deprecated in 1.2.0
+  lifecycle::deprecate_soft("1.1.0",
+    I("Using an external vector in selections"),
+    I("`all_of()` or `any_of()`"),
+    details = c(
+      " " = "# Was:",
+      " " = glue("data %>% select({name})"),
+      "",
+      " " = "# Now:",
+      " " = glue("data %>% select(all_of({name}))"),
+      "",
+      "See <https://tidyselect.r-lib.org/reference/faq-external-vector.html>."
+    ),
+    user_env = env
+  )
 
   value
 }
 
 validate_dot_data <- function(expr, call) {
   if (is_call(expr, "$") && !is_symbol(expr[[3]])) {
-    abort("The RHS of `.data$rhs` must be a symbol.", call = call)
+    cli::cli_abort(
+      "The RHS of {.code .data$rhs} must be a symbol.",
+      call = call
+    )
   }
   if (is_call(expr, "[[") && is_symbolic(expr[[3]])) {
-    abort("The subscript of `.data[[subscript]]` must be a constant.", call = call)
+    cli::cli_abort(
+      "The subscript of {.code .data[[subscript]]} must be a constant.",
+      call = call
+    )
   }
 }
 

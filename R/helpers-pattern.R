@@ -5,14 +5,18 @@
 #' These [selection helpers][language] match variables according
 #' to a given pattern.
 #'
-#' * [starts_with()]: Starts with a prefix.
-#' * [ends_with()]: Ends with a suffix.
+#' * [starts_with()]: Starts with an exact prefix.
+#' * [ends_with()]: Ends with an exact suffix.
 #' * [contains()]: Contains a literal string.
 #' * [matches()]: Matches a regular expression.
 #' * [num_range()]: Matches a numerical range like x01, x02, x03.
 #'
 #' @param match A character vector. If length > 1, the union of the
 #'   matches is taken.
+#'
+#'   For `starts_with()`, `ends_with()`, and `contains()` this is an exact
+#'   match. For `matches()` this is a regular expression, and can be a
+#'   stringr pattern.
 #' @param ignore.case If `TRUE`, the default, ignores case when matching
 #'   names.
 #' @param vars A character vector of variable names. If not supplied,
@@ -58,8 +62,8 @@
 #' iris %>% select(contains("al"))
 #' ```
 #'
-#' These helpers do not use regular expressions. To select with a
-#' regexp use `matches()`
+#' `starts_with()`, `ends_with()`, and `contains()` do not use regular expressions. To select with a
+#' regexp use `matches()`:
 #'
 #' ```{r, comment = "#>", collapse = TRUE}
 #' # [pt] is matched literally:
@@ -87,8 +91,8 @@ starts_with <- function(match,
   vars <- vars %||% peek_vars(fn = "starts_with")
 
   if (ignore.case) {
-     vars <- tolower(vars)
-     match <- tolower(match)
+    vars <- tolower(vars)
+    match <- tolower(match)
   }
 
   flat_map_int(match, starts_with_impl, vars)
@@ -144,17 +148,36 @@ matches <- function(match,
                     vars = NULL) {
   check_match(match)
   vars <- vars %||% peek_vars(fn = "matches")
-  flat_map_int(match, grep_vars, vars, ignore.case = ignore.case, perl = perl)
+
+  if (inherits(match, "pattern") || inherits(match, "stringr_pattern")) {
+    check_installed("stringr")
+    if (!missing(ignore.case)) {
+      cli::cli_abort("{.arg ignore.case} not supported when {.arg match} is a {.pkg stringr} pattern.")
+    }
+    if (!missing(perl)) {
+      cli::cli_abort("{.arg perl} not supported when {.arg match} is a {.pkg stringr} pattern.")
+    }
+
+    # no [ or [[ methods for pattern objects
+    if (length(match) > 1) {
+      cli::cli_abort("{.pkg stringr} patterns must be length 1.")
+    }
+
+    stringr::str_which(vars, match)
+  } else {
+    flat_map_int(match, grep_vars, vars, ignore.case = ignore.case, perl = perl)
+  }
 }
 
 #' @rdname starts_with
-#' @param prefix A prefix that starts the numeric range.
+#' @param prefix,suffix A prefix/suffix added before/after the numeric range.
 #' @param range A sequence of integers, like `1:5`.
 #' @param width Optionally, the "width" of the numeric range. For example,
 #'   a range of 2 gives "01", a range of three "001", etc.
 #' @export
 num_range <- function(prefix,
                       range,
+                      suffix = "",
                       width = NULL,
                       vars = NULL) {
   vars <- vars %||% peek_vars(fn = "num_range")
@@ -163,12 +186,12 @@ num_range <- function(prefix,
     range <- sprintf(paste0("%0", width, "d"), range)
   }
 
-  match_vars(paste0(prefix, range), vars)
+  match_vars(paste0(prefix, range, suffix), vars)
 }
 
 check_match <- function(match) {
   if (!is_character(match) || !all(nzchar(match))) {
-    abort("`match` must be a character vector of non empty strings.")
+    cli::cli_abort("{.arg match} must be a character vector of non empty strings.")
   }
 }
 

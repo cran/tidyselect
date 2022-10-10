@@ -26,44 +26,33 @@
       Error in `select_loc()`:
       ! Can't use arithmetic operator `^` in selection context.
 
-# symbol evaluation only informs once (#184)
+# symbol lookup outside data informs caller about better practice
 
     Code
-      # Default
-      with_options(tidyselect_verbosity = NULL, {
-        `_vars_default` <- "cyl"
-        select_loc(mtcars, `_vars_default`)
-        select_loc(mtcars, `_vars_default`)
-        invisible(NULL)
-      })
-    Message
-      Note: Using an external vector in selections is ambiguous.
-      i Use `all_of(_vars_default)` instead of `_vars_default` to silence this message.
-      i See <https://tidyselect.r-lib.org/reference/faq-external-vector.html>.
-      This message is displayed once per session.
+      vars <- c("a", "b")
+      select_loc(letters2, vars)
+    Condition
+      Warning:
+      Using an external vector in selections was deprecated in tidyselect 1.1.0.
+      i Please use `all_of()` or `any_of()` instead.
+        # Was:
+        data %>% select(vars)
+      
+        # Now:
+        data %>% select(all_of(vars))
+      
+      See <https://tidyselect.r-lib.org/reference/faq-external-vector.html>.
+    Output
+      a b 
+      1 2 
+
+# can forbid use of predicates
+
     Code
-      # Verbose
-      with_options(tidyselect_verbosity = "verbose", {
-        `_vars_verbose` <- "cyl"
-        select_loc(mtcars, `_vars_verbose`)
-        select_loc(mtcars, `_vars_verbose`)
-        invisible(NULL)
-      })
-    Message
-      Note: Using an external vector in selections is ambiguous.
-      i Use `all_of(_vars_verbose)` instead of `_vars_verbose` to silence this message.
-      i See <https://tidyselect.r-lib.org/reference/faq-external-vector.html>.
-      Note: Using an external vector in selections is ambiguous.
-      i Use `all_of(_vars_verbose)` instead of `_vars_verbose` to silence this message.
-      i See <https://tidyselect.r-lib.org/reference/faq-external-vector.html>.
-    Code
-      # Quiet
-      with_options(tidyselect_verbosity = "quiet", {
-        `_vars_quiet` <- "cyl"
-        select_loc(mtcars, `_vars_quiet`)
-        select_loc(mtcars, `_vars_quiet`)
-        invisible(NULL)
-      })
+      select_loc(iris, where(is.factor), allow_predicates = FALSE)
+    Condition
+      Error in `select_loc()`:
+      ! This tidyselect interface doesn't support predicates.
 
 # selections provide informative errors
 
@@ -71,57 +60,78 @@
       # Foreign errors during evaluation
       select_loc(iris, eval_tidy(foobar))
     Condition
-      Error:
+      Error in `select_loc()`:
+      ! Problem while evaluating `eval_tidy(foobar)`.
+      Caused by error:
       ! object 'foobar' not found
+
+# use of .data is deprecated
+
+    Code
+      x <- select_loc(x, .data$a)
+    Condition
+      Warning:
+      Use of .data in tidyselect expressions was deprecated in tidyselect 1.2.0.
+      i Please use `"a"` instead of `.data$a`
+
+---
+
+    Code
+      x <- select_loc(x, .data[[var]])
+    Condition
+      Warning:
+      Use of .data in tidyselect expressions was deprecated in tidyselect 1.2.0.
+      i Please use `all_of(var)` (or `any_of(var)`) instead of `.data[[var]]`
 
 # eval_walk() has informative messages
 
     Code
-      # # Using a predicate without where() warns
+      # Using a predicate without where() warns
       invisible(select_loc(iris, is_integer))
     Condition
       Warning:
-      Predicate functions must be wrapped in `where()`.
-      
-        # Bad
+      Use of bare predicate functions was deprecated in tidyselect 1.1.0.
+      i Please use wrap predicates in `where()` instead.
+        # Was:
         data %>% select(is_integer)
       
-        # Good
+        # Now:
         data %>% select(where(is_integer))
-      
-      i Please update your code.
-      This message is displayed once per session.
     Code
       invisible(select_loc(iris, is.numeric))
     Condition
       Warning:
-      Predicate functions must be wrapped in `where()`.
-      
-        # Bad
+      Use of bare predicate functions was deprecated in tidyselect 1.1.0.
+      i Please use wrap predicates in `where()` instead.
+        # Was:
         data %>% select(is.numeric)
       
-        # Good
+        # Now:
         data %>% select(where(is.numeric))
-      
-      i Please update your code.
-      This message is displayed once per session.
     Code
       invisible(select_loc(iris, isTRUE))
     Condition
       Warning:
-      Predicate functions must be wrapped in `where()`.
-      
-        # Bad
+      Use of bare predicate functions was deprecated in tidyselect 1.1.0.
+      i Please use wrap predicates in `where()` instead.
+        # Was:
         data %>% select(isTRUE)
       
-        # Good
+        # Now:
         data %>% select(where(isTRUE))
-      
-      i Please update your code.
-      This message is displayed once per session.
     Code
       # Warning is not repeated
       invisible(select_loc(iris, is_integer))
+    Condition
+      Warning:
+      Use of bare predicate functions was deprecated in tidyselect 1.1.0.
+      i Please use wrap predicates in `where()` instead.
+        # Was:
+        data %>% select(is_integer)
+      
+        # Now:
+        data %>% select(where(is_integer))
+    Code
       # formula shorthand must be wrapped
       (expect_error(select_loc(mtcars, ~ is.numeric(.x))))
     Output
@@ -166,4 +176,17 @@
       <error/rlang_error>
       Error in `select_loc()`:
       ! The RHS of `.data$rhs` must be a symbol.
+
+# can forbid empty selection
+
+    Code
+      ensure_named(integer(), allow_empty = FALSE)
+    Condition
+      Error:
+      ! Must select at least one item.
+    Code
+      ensure_named(integer(), allow_empty = FALSE, allow_rename = FALSE)
+    Condition
+      Error:
+      ! Must select at least one item.
 

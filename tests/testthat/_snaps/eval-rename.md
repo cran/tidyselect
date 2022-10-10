@@ -1,3 +1,11 @@
+# rename_loc() works with predicate functions
+
+    Code
+      rename_loc(x, where(is.numeric))
+    Condition
+      Error in `rename_loc()`:
+      ! All renaming inputs must be named.
+
 # rename_loc() throws helpful errors
 
     Code
@@ -10,7 +18,7 @@
       # Duplicate names (FIXME)
       rename_loc(mtcars, c(foo = cyl, foo = disp))
     Condition
-      Error in `stop_vctrs()`:
+      Error in `rename_loc()`:
       ! Names must be unique.
       x These names are duplicated:
         * "foo" at locations 1 and 2.

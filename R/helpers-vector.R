@@ -74,20 +74,30 @@
 #' @seealso `r rd_helpers_seealso()`
 #' @export
 all_of <- function(x) {
-  if (is.function(x)) {
-    # Trigger bad type error
-    vctrs::vec_as_location(x, 0L)
-    abort("Internal error: `all_of()` should have failed sooner")
+  if (!has_vars()) {
+    lifecycle::deprecate_soft(
+      "1.2.0",
+      I("Using `all_of()` outside of a selecting function"),
+      details = paste("See details at", peek_vars_link())
+    )
+    return(x)
   }
 
-  x
+  vars <- peek_vars(fn = "all_of")
+  as_indices_impl(x, vars = vars, strict = TRUE)
 }
 
 #' @rdname all_of
-#' @inheritParams ellipsis::dots_empty
+#' @inheritParams rlang::args_dots_empty
 #' @export
 any_of <- function(x, ..., vars = NULL) {
   vars <- vars %||% peek_vars(fn = "any_of")
-  ellipsis::check_dots_empty()
+  if (!missing(...)) {
+    cli::cli_abort(c(
+      "{.arg ...} must be empty.",
+      i = "Did you forget {.code c()}?",
+      i = 'The expected syntax is {.code any_of(c("a", "b"))}, not {.code any_of("a", "b")}'
+    ))
+  }
   as_indices_impl(x, vars = vars, strict = FALSE)
 }

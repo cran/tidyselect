@@ -1,11 +1,20 @@
 # errors for bad inputs
 
     Code
-      vars_pull(letters, letters)
+      vars_pull(letters, character())
     Condition
       Error:
-      ! Must extract column with a single valid subscript.
-      x Subscript `var` has size 26 but must be size 1.
+      ! `character()` must select exactly one column.
+    Code
+      vars_pull(letters, c("a", "b"))
+    Condition
+      Error:
+      ! `c("a", "b")` must select exactly one column.
+    Code
+      vars_pull(letters, !!c("a", "b"))
+    Condition
+      Error:
+      ! `!!c("a", "b")` must select exactly one column.
     Code
       vars_pull(letters, aa)
     Condition
@@ -16,61 +25,61 @@
     Condition
       Error:
       ! Must extract column with a single valid subscript.
-      x Subscript `var` has value 0 but must be a positive location.
+      x Subscript `0` has value 0 but must be a positive location.
     Code
       vars_pull(letters, 100)
     Condition
-      Error in `stop_subscript()`:
-      ! Can't extract columns that don't exist.
-      x Location 100 doesn't exist.
+      Error in `vec_as_location2_result()`:
+      ! Can't extract columns past the end.
+      i Location 100 doesn't exist.
       i There are only 26 columns.
     Code
       vars_pull(letters, -100)
     Condition
-      Error in `stop_subscript()`:
-      ! Can't extract columns that don't exist.
-      x Location 100 doesn't exist.
+      Error in `vec_as_location2_result()`:
+      ! Can't extract columns past the end.
+      i Location 100 doesn't exist.
       i There are only 26 columns.
     Code
       vars_pull(letters, -Inf)
     Condition
       Error:
       ! Must extract column with a single valid subscript.
-      x Can't convert from `var` <double> to <integer> due to loss of precision.
-      Caused by error in `stop_vctrs()`:
-      ! Can't convert from `var` <double> to <integer> due to loss of precision.
-      * Locations: 1
+      x Subscript `-Inf` has the wrong type `double`.
+      i It must be numeric or character.
     Code
       vars_pull(letters, TRUE)
     Condition
       Error:
       ! Must extract column with a single valid subscript.
-      x Subscript `var` has the wrong type `logical`.
+      x Subscript `TRUE` has the wrong type `logical`.
       i It must be numeric or character.
     Code
       vars_pull(letters, NA)
     Condition
       Error:
       ! Must extract column with a single valid subscript.
-      x Subscript `var` can't be `NA`.
+      x Subscript `NA` can't be `NA`.
     Code
       vars_pull(letters, na_int)
     Condition
       Error:
       ! Must extract column with a single valid subscript.
-      x Subscript `var` can't be `NA`.
+      x Subscript `na_int` can't be `NA`.
     Code
       vars_pull(letters, "foo")
     Condition
-      Error in `stop_subscript()`:
+      Error in `vec_as_location2_result()`:
       ! Can't extract columns that don't exist.
       x Column `foo` doesn't exist.
+
+# gives informative error if quosure is missing
+
     Code
-      vars_pull(letters, !!c("a", "b"))
+      f()
     Condition
-      Error:
-      ! Must extract column with a single valid subscript.
-      x Subscript `var` has size 2 but must be size 1.
+      Error in `f()`:
+      ! `var` is absent but must be supplied.
 
 # vars_pull() has informative errors
 
@@ -97,22 +106,29 @@
       print(expect_error(vars_pull(letters, f(base = TRUE))))
     Output
       <error/rlang_error>
-      Error in `h()`:
+      Error:
+      ! Problem while evaluating `f(base = TRUE)`.
+      Caused by error in `h()`:
       ! foo
+      ---
       Backtrace:
         1. base::print(expect_error(vars_pull(letters, f(base = TRUE))))
-       17. base::.handleSimpleError(`<fn>`, "foo", base::quote(h(base)))
-       18. rlang h(simpleError(msg, call))
-       19. handlers[[1L]](cnd)
+       17. tidyselect (local) f(base = TRUE)
+       18. tidyselect (local) g(base)
+       19. tidyselect (local) h(base)
+       20. base::stop("foo")
     Code
       print(expect_error(vars_pull(letters, f(base = FALSE))))
     Output
       <error/rlang_error>
-      Error in `h()`:
+      Error:
+      ! Problem while evaluating `f(base = FALSE)`.
+      Caused by error in `h()`:
       ! foo
+      ---
       Backtrace:
         1. base::print(expect_error(vars_pull(letters, f(base = FALSE))))
-       13. tidyselect f(base = FALSE)
-       14. tidyselect g(base)
-       15. tidyselect h(base)
+       17. tidyselect (local) f(base = FALSE)
+       18. tidyselect (local) g(base)
+       19. tidyselect (local) h(base)
 

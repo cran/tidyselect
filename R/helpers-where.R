@@ -59,16 +59,14 @@
 #' iris %>% select(where(~ is.numeric(.x) && mean(.x) > 3.5))
 #' ```
 #'
-#' @name where
+#' @export
 where <- function(fn) {
   predicate <- as_function(fn)
+  call <- current_call()
 
   function(x, ...) {
     out <- predicate(x, ...)
-
-    if (!is_bool(out)) {
-      abort("`where()` must be used with functions that return `TRUE` or `FALSE`.")
-    }
+    check_predicate_output(out, call = call)
 
     out
   }

@@ -36,7 +36,14 @@
 #' @param allow_rename If `TRUE` (the default), the renaming syntax
 #'   `c(foo = bar)` is allowed. If `FALSE`, it causes an error. This
 #'   is useful to implement purely selective behaviour.
-#' @inheritParams ellipsis::dots_empty
+#' @param allow_empty If `TRUE` (the default), it is ok for `expr` to result
+#'   in an empty selection. If `FALSE`, will error if `expr` yields an empty
+#'   selection.
+#' @param allow_predicates If `TRUE` (the default), it is ok for `expr` to
+#'   use predicates (i.e. in `where()`). If `FALSE`, will error if `expr` uses a
+#'   predicate. Will automatically be set to `FALSE` if `data` does not
+#'   support predicates (as determined by [tidyselect_data_has_predicates()]).
+#' @inheritParams rlang::args_dots_empty
 #'
 #' @return A named vector of numeric locations, one for each of the
 #'   selected elements.
@@ -122,8 +129,14 @@ eval_select <- function(expr,
                         strict = TRUE,
                         name_spec = NULL,
                         allow_rename = TRUE,
+                        allow_empty = TRUE,
+                        allow_predicates = TRUE,
                         error_call = caller_env()) {
-  ellipsis::check_dots_empty()
+  check_dots_empty()
+
+  allow_predicates <- allow_predicates && tidyselect_data_has_predicates(data)
+  data <- tidyselect_data_proxy(data)
+
   eval_select_impl(
     data,
     names(data),
@@ -133,6 +146,8 @@ eval_select <- function(expr,
     strict = strict,
     name_spec = name_spec,
     allow_rename = allow_rename,
+    allow_empty = allow_empty,
+    allow_predicates = allow_predicates,
     error_call = error_call,
   )
 }
@@ -146,13 +161,15 @@ eval_select_impl <- function(x,
                              name_spec = NULL,
                              uniquely_named = NULL,
                              allow_rename = TRUE,
+                             allow_empty = TRUE,
+                             allow_predicates = TRUE,
                              type = "select",
                              error_call = caller_env()) {
   if (!is_null(x)) {
     vctrs::vec_assert(x)
   }
   if (is_null(names)) {
-    abort("Can't select within an unnamed vector.", call = error_call)
+    cli::cli_abort("Can't select within an unnamed vector.", call = error_call)
   }
 
   # Put vars in scope and peek validated vars
@@ -161,15 +178,8 @@ eval_select_impl <- function(x,
 
   local_data(x)
 
-  if (length(include)) {
-    expr <- quo(all_of(include) | !!expr)
-  }
-  if (length(exclude)) {
-    expr <- quo(!!expr & !any_of(exclude))
-  }
-
   with_subscript_errors(
-    vars_select_eval(
+    out <- vars_select_eval(
       vars,
       expr,
       strict = strict,
@@ -177,11 +187,43 @@ eval_select_impl <- function(x,
       name_spec = name_spec,
       uniquely_named = uniquely_named,
       allow_rename = allow_rename,
+      allow_empty = allow_empty,
+      allow_predicates = allow_predicates,
       type = type,
       error_call = error_call
     ),
     type = type
   )
+
+  if (length(include) > 0) {
+    if (!is.character(include)) {
+      cli::cli_abort("{.arg include} must be a character vector.", call = error_call)
+    }
+
+    missing <- setdiff(include, names)
+    if (length(missing) > 0) {
+      cli::cli_abort(c(
+        "{.arg include} must only include variables found in {.arg data}.",
+        i = "Unknown variables: {.and {missing}}"
+      ), call = error_call)
+    }
+
+    to_include <- vctrs::vec_match(include, names)
+    names(to_include) <- names[to_include]
+
+    out <- c(to_include[!to_include %in% out], out)
+  }
+
+  if (length(exclude) > 0) {
+    if (!is.character(exclude)) {
+      cli::cli_abort("{.arg include} must be a character vector.", call = error_call)
+    }
+
+    to_exclude <- vctrs::vec_match(intersect(exclude, names), names)
+    out <- out[!out %in% to_exclude]
+  }
+
+  out
 }
 
 # Example implementation mainly used for unit tests

@@ -6,6 +6,7 @@
 #' negative numbers to select columns from the end.
 #'
 #' @inheritParams vars_select
+#' @inheritParams rlang::args_error_context
 #' @param var A variable specified as:
 #'   * a literal variable name
 #'   * a positive integer, giving the position counting from the left
@@ -30,39 +31,65 @@
 #'
 #' # You can unquote variables:
 #' var <- 10
-#' vars_pull(letters, !! var)
-vars_pull <- function(vars, var = -1) {
+#' vars_pull(letters, !!var)
+vars_pull <- function(vars, var = -1, error_call = caller_env(), error_arg = caller_arg(var)) {
+  expr <- enquo(var)
+  if (quo_is_missing(expr)) {
+    # No easy way to determine what var is in parent because it's likely
+    # to be embraced; so don't try and use error_arg here
+    cli::cli_abort(
+      "{.arg var} is absent but must be supplied.",
+      call = error_call
+    )
+  }
+
+  local_vars(vars)
   n <- length(vars)
 
-  with_entraced_errors(
-    loc <- eval_tidy(enquo(var), set_names(seq_along(vars), vars))
+  with_chained_errors(
+    loc <- eval_tidy(expr, set_names(seq_along(vars), vars)),
+    call = error_call,
+    eval_expr = expr
   )
-  loc <- pull_as_location2(loc, n, vars)
+
+  loc <- pull_as_location2(loc, n, vars, error_arg = error_arg, error_call = error_call)
 
   if (loc < 0L) {
     loc <- n + 1L + loc
   }
-
   vars[[loc]]
 }
 
-pull_as_location2 <- function(i, n, names) {
+pull_as_location2 <- function(i, n, names, error_call = caller_env(), error_arg = "var") {
   with_subscript_errors(type = "pull", {
-    i <- vctrs::vec_as_subscript2(i, arg = "var", logical = "error")
+    i <- vctrs::vec_as_subscript2(i,
+      logical = "error",
+      arg = error_arg,
+      call = error_call
+    )
+
+    if (length(i) != 1) {
+      cli::cli_abort(
+        "{.arg {error_arg}} must select exactly one column.",
+        call = error_call
+      )
+    }
 
     if (is.numeric(i)) {
       vctrs::num_as_location2(
         i,
         n = n,
         negative = "ignore",
-        arg = "var"
+        arg = error_arg,
+        call = error_call
       )
     } else {
       vctrs::vec_as_location2(
         i,
         n = n,
         names = names,
-        arg = "var"
+        arg = error_arg,
+        call = error_call,
       )
     }
   })

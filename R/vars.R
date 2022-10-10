@@ -2,7 +2,7 @@
 peeker <- function(what) {
   function(..., fn = NULL) {
     if (!missing(...)) {
-      ellipsis::check_dots_empty()
+      check_dots_empty()
     }
 
     x <- vars_env[[what]]
@@ -15,14 +15,25 @@ peeker <- function(what) {
       }
 
       # Please keep in sync with faq.R.
-      msg <- glue_c(
-        "{fn} must be used within a *selecting* function.",
-        i = "See <https://tidyselect.r-lib.org/reference/faq-selection-context.html>."
+      cli::cli_abort(
+        c(
+          "{fn} must be used within a *selecting* function.",
+          i = "See {peek_vars_link()} for details."
+        ),
+        call = NULL
       )
-      abort(msg, call = NULL)
     }
 
     x
+  }
+}
+
+peek_vars_link <- function() {
+  if (is_interactive() && cli::ansi_has_hyperlink_support()) {
+    topic <- "tidyselect::faq-selection-context"
+    cli::style_hyperlink(paste0("?", topic), "ide:help", params = c(package = "tidyselect", topic = "faq-selection-context"))
+  } else {
+    "<https://tidyselect.r-lib.org/reference/faq-selection-context.html>"
   }
 }
 
@@ -46,7 +57,7 @@ peeker <- function(what) {
 #' [selection helpers][language] to the current selection
 #' context.
 #'
-#' @inheritParams ellipsis::dots_empty
+#' @inheritParams rlang::args_dots_empty
 #' @param fn The name of the function to use in error messages when
 #'   the helper is used in the wrong context. If not supplied, a
 #'   generic error message is used instead.
@@ -153,22 +164,14 @@ poke_data <- function(data) {
 #' @export
 scoped_vars <- function(vars, frame = caller_env()) {
   old <- poke_vars(vars)
-
-  # Inline everything so the call will succeed in any environment
-  expr <- call2(on.exit, call2(poke_vars, old), add = TRUE)
-  eval_bare(expr, frame)
-
+  withr::defer(poke_vars(old), envir = frame)
   invisible(old)
 }
 local_vars <- scoped_vars
 
 local_data <- function(data, frame = caller_env()) {
   old <- poke_data(data)
-
-  # Inline everything so the call will succeed in any environment
-  expr <- call2(on.exit, call2(poke_data, old), add = TRUE)
-  eval_bare(expr, frame)
-
+  withr::defer(poke_data(old), envir = frame)
   invisible(old)
 }
 
