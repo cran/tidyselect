@@ -4,7 +4,7 @@
       select_loc(letters2, all_of(c("a", "bar", "c")), strict = FALSE)
     Condition
       Error in `select_loc()`:
-      ! Problem while evaluating `all_of(c("a", "bar", "c"))`.
+      i In argument: `all_of(c("a", "bar", "c"))`.
       Caused by error in `all_of()`:
       ! Can't subset elements that don't exist.
       x Element `bar` doesn't exist.
@@ -28,41 +28,37 @@
     Output
       <error/rlang_error>
       Error in `select_loc()`:
-      ! Problem while evaluating `all_of(TRUE)`.
+      i In argument: `all_of(TRUE)`.
       Caused by error in `all_of()`:
-      ! Must subset elements with a valid subscript vector.
-      x Subscript has the wrong type `logical`.
-      i It must be numeric or character.
+      ! Can't subset elements.
+      x Subscript must be numeric or character, not `TRUE`.
     Code
       (expect_error(select_loc(letters2, any_of(TRUE))))
     Output
       <error/rlang_error>
       Error in `select_loc()`:
-      ! Problem while evaluating `any_of(TRUE)`.
+      i In argument: `any_of(TRUE)`.
       Caused by error in `any_of()`:
-      ! Must subset elements with a valid subscript vector.
-      x Subscript has the wrong type `logical`.
-      i It must be numeric or character.
+      ! Can't subset elements.
+      x Subscript must be numeric or character, not `TRUE`.
     Code
       (expect_error(select_loc(letters2, any_of(is.factor))))
     Output
       <error/rlang_error>
       Error in `select_loc()`:
-      ! Problem while evaluating `any_of(is.factor)`.
+      i In argument: `any_of(is.factor)`.
       Caused by error in `any_of()`:
-      ! Must subset elements with a valid subscript vector.
-      x Subscript has the wrong type `function`.
-      i It must be numeric or character.
+      ! Can't subset elements.
+      x Subscript must be numeric or character, not a function.
     Code
       (expect_error(select_loc(letters2, all_of(is.factor))))
     Output
       <error/rlang_error>
       Error in `select_loc()`:
-      ! Problem while evaluating `all_of(is.factor)`.
+      i In argument: `all_of(is.factor)`.
       Caused by error in `all_of()`:
-      ! Must subset elements with a valid subscript vector.
-      x Subscript has the wrong type `function`.
-      i It must be numeric or character.
+      ! Can't subset elements.
+      x Subscript must be numeric or character, not a function.
 
 # any_of() errors out of context
 

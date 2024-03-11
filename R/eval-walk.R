@@ -250,7 +250,7 @@ as_indices_impl <- function(x, vars, strict, call = caller_env(), arg = NULL) {
     # Remove out-of-bounds elements if non-strict. We do this eagerly
     # because names vectors must be converted to locations here.
     x <- switch(typeof(x),
-      character = set_intersect(x, c(vars, na_chr)),
+      character = vctrs::vec_set_intersect(x, c(vars, na_chr)),
       double = ,
       integer = x[x <= length(vars)],
       x
@@ -391,7 +391,9 @@ eval_sym <- function(expr, data_mask, context_mask, strict = FALSE) {
   value <- missing_arg()
   while (!is_reference(cur, top)) {
     if (env_has(cur, name)) {
-      value <- env_get(cur, name)
+      # TODO: Remove unnecessary `default` specification after
+      # https://github.com/r-lib/rlang/issues/1582
+      value <- env_get(cur, name, default = NULL)
       break
     }
     cur <- env_parent(cur)

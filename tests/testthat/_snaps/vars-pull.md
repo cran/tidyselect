@@ -24,19 +24,19 @@
       vars_pull(letters, 0)
     Condition
       Error:
-      ! Must extract column with a single valid subscript.
-      x Subscript `0` has value 0 but must be a positive location.
+      ! Can't extract column with `0`.
+      x Subscript `0` must be a positive location, not 0.
     Code
       vars_pull(letters, 100)
     Condition
-      Error in `vec_as_location2_result()`:
+      Error:
       ! Can't extract columns past the end.
       i Location 100 doesn't exist.
       i There are only 26 columns.
     Code
       vars_pull(letters, -100)
     Condition
-      Error in `vec_as_location2_result()`:
+      Error:
       ! Can't extract columns past the end.
       i Location 100 doesn't exist.
       i There are only 26 columns.
@@ -44,32 +44,30 @@
       vars_pull(letters, -Inf)
     Condition
       Error:
-      ! Must extract column with a single valid subscript.
-      x Subscript `-Inf` has the wrong type `double`.
-      i It must be numeric or character.
+      ! Can't extract column with `-Inf`.
+      x Can't convert from `-Inf` <double> to <integer> due to loss of precision.
     Code
       vars_pull(letters, TRUE)
     Condition
       Error:
-      ! Must extract column with a single valid subscript.
-      x Subscript `TRUE` has the wrong type `logical`.
-      i It must be numeric or character.
+      ! Can't extract column with `TRUE`.
+      x `TRUE` must be numeric or character, not `TRUE`.
     Code
       vars_pull(letters, NA)
     Condition
       Error:
-      ! Must extract column with a single valid subscript.
-      x Subscript `NA` can't be `NA`.
+      ! Can't extract column with `NA`.
+      x Subscript `NA` must be a location, not an integer `NA`.
     Code
       vars_pull(letters, na_int)
     Condition
       Error:
-      ! Must extract column with a single valid subscript.
-      x Subscript `na_int` can't be `NA`.
+      ! Can't extract column with `na_int`.
+      x Subscript `na_int` must be a location, not an integer `NA`.
     Code
       vars_pull(letters, "foo")
     Condition
-      Error in `vec_as_location2_result()`:
+      Error:
       ! Can't extract columns that don't exist.
       x Column `foo` doesn't exist.
 
@@ -107,28 +105,50 @@
     Output
       <error/rlang_error>
       Error:
-      ! Problem while evaluating `f(base = TRUE)`.
+      i In argument: `f(base = TRUE)`.
       Caused by error in `h()`:
       ! foo
       ---
       Backtrace:
-        1. base::print(expect_error(vars_pull(letters, f(base = TRUE))))
-       17. tidyselect (local) f(base = TRUE)
-       18. tidyselect (local) g(base)
-       19. tidyselect (local) h(base)
-       20. base::stop("foo")
+           x
+        1. +-base::print(expect_error(vars_pull(letters, f(base = TRUE))))
+        2. +-testthat::expect_error(vars_pull(letters, f(base = TRUE)))
+        3. | \-testthat:::expect_condition_matching(...)
+        4. |   \-testthat:::quasi_capture(...)
+        5. |     +-testthat (local) .capture(...)
+        6. |     | \-base::withCallingHandlers(...)
+        7. |     \-rlang::eval_bare(quo_get_expr(.quo), quo_get_env(.quo))
+        8. +-tidyselect::vars_pull(letters, f(base = TRUE))
+        9. | +-tidyselect:::with_chained_errors(...)
+       10. | | \-base::withCallingHandlers(...)
+       11. | \-rlang::eval_tidy(expr, set_names(seq_along(vars), vars))
+       12. \-tidyselect (local) f(base = TRUE)
+       13.   \-tidyselect (local) g(base)
+       14.     \-tidyselect (local) h(base)
+       15.       \-base::stop("foo")
     Code
       print(expect_error(vars_pull(letters, f(base = FALSE))))
     Output
       <error/rlang_error>
       Error:
-      ! Problem while evaluating `f(base = FALSE)`.
+      i In argument: `f(base = FALSE)`.
       Caused by error in `h()`:
       ! foo
       ---
       Backtrace:
-        1. base::print(expect_error(vars_pull(letters, f(base = FALSE))))
-       17. tidyselect (local) f(base = FALSE)
-       18. tidyselect (local) g(base)
-       19. tidyselect (local) h(base)
+           x
+        1. +-base::print(expect_error(vars_pull(letters, f(base = FALSE))))
+        2. +-testthat::expect_error(vars_pull(letters, f(base = FALSE)))
+        3. | \-testthat:::expect_condition_matching(...)
+        4. |   \-testthat:::quasi_capture(...)
+        5. |     +-testthat (local) .capture(...)
+        6. |     | \-base::withCallingHandlers(...)
+        7. |     \-rlang::eval_bare(quo_get_expr(.quo), quo_get_env(.quo))
+        8. +-tidyselect::vars_pull(letters, f(base = FALSE))
+        9. | +-tidyselect:::with_chained_errors(...)
+       10. | | \-base::withCallingHandlers(...)
+       11. | \-rlang::eval_tidy(expr, set_names(seq_along(vars), vars))
+       12. \-tidyselect (local) f(base = FALSE)
+       13.   \-tidyselect (local) g(base)
+       14.     \-tidyselect (local) h(base)
 

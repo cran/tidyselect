@@ -1,5 +1,5 @@
 with_subscript_errors <- function(expr, type = "select") {
-  try_fetch(
+  withCallingHandlers(
     expr,
     vctrs_error_subscript = function(cnd) {
       cnd$subscript_action <- subscript_action(type)
@@ -10,7 +10,7 @@ with_subscript_errors <- function(expr, type = "select") {
 }
 
 with_chained_errors <- function(expr, action, call, eval_expr = NULL) {
-  try_fetch(
+  withCallingHandlers(
     expr,
     error = function(cnd) {
       eval_expr <- quo_squash(eval_expr)
@@ -19,23 +19,24 @@ with_chained_errors <- function(expr, action, call, eval_expr = NULL) {
         msg <- ""
       } else {
         code <- as_label(eval_expr)
-        msg <- cli::format_inline("Problem while evaluating {.code {code}}.")
+        msg <- cli::format_inline("In argument: {.code {code}}.")
       }
-      abort(msg, call = call, parent = cnd)
+      cli::cli_abort(c("i" = msg), call = call, parent = cnd)
     }
   )
 }
 
 subscript_action <- function(type) {
   switch(validate_type(type),
-    select = "subset",
+    select = "select",
     rename = "rename",
+    relocate = "relocate",
     pull = "extract"
   )
 }
 validate_type <- function(type) {
   # We might add `recode` in the future
-  if (!is_string(type, c("select", "rename", "pull"))) {
+  if (!is_string(type, c("select", "rename", "relocate", "pull"))) {
     cli::cli_abort("Unexpected value for {.arg tidyselect_type}.", .internal = TRUE)
   }
   type

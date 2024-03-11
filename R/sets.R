@@ -2,25 +2,28 @@
 # The `sel_` prefixed operations match on both values and names, with
 # unnamed elements matching named ones
 sel_union <- function(x, y) {
-  if (is_null(names(x)) && is_null(names(y))) {
-    set_union(x, y)
+  if (any_valid_names(names(x)) || any_valid_names(names(y))) {
+    sel_operation(x, y, vctrs::vec_set_union)
   } else {
-    sel_operation(x, y, set_union)
+    vctrs::vec_set_union(x, y)
   }
 }
 sel_intersect <- function(x, y) {
-  if (is_null(names(x)) && is_null(names(y))) {
-    set_intersect(x, y)
+  if (any_valid_names(names(x)) || any_valid_names(names(y))) {
+    sel_operation(x, y, vctrs::vec_set_intersect)
   } else {
-    sel_operation(x, y, set_intersect)
+    vctrs::vec_set_intersect(x, y)
   }
 }
 sel_unique <- function(x) {
-  x <- vctrs::new_data_frame(list(value = x, names = names2(x)))
-  x <- propagate_names(x)
-
-  out <- vctrs::vec_unique(x)
-  set_names(out$value, out$names)
+  if (any_valid_names(names(x))) {
+    x <- vctrs::new_data_frame(list(value = x, names = names2(x)))
+    x <- propagate_names(x)
+    out <- vctrs::vec_unique(x)
+    set_names(out$value, out$names)
+  } else {
+    vctrs::vec_unique(x)
+  }
 }
 
 # Set difference and set complement must validate their RHS eagerly,
@@ -29,10 +32,10 @@ sel_diff <- function(x, y, vars = NULL, error_call = caller_env()) {
   if (!is_null(vars)) {
     y <- loc_validate(y, vars, call = error_call)
   }
-  if (is_null(names(x)) || is_null(names(y))) {
-    set_diff(x, y)
+  if (any_valid_names(names(x)) && any_valid_names(names(y))) {
+    sel_operation(x, y, vctrs::vec_set_difference)
   } else {
-    sel_operation(x, y, set_diff)
+    vctrs::vec_set_difference(x, y)
   }
 }
 sel_complement <- function(x, vars = NULL, error_call = caller_env()) {
@@ -69,19 +72,4 @@ propagate_names <- function(x, from = NULL) {
   x$names[unnamed][matches != 0L] <- from$names[matches]
 
   x
-}
-
-# https://github.com/r-lib/vctrs/issues/548
-set_diff <- function(x, y) {
-  vctrs::vec_unique(vctrs::vec_slice(x, !vctrs::vec_in(x, y)))
-}
-set_intersect <- function(x, y) {
-  pos <- vctrs::vec_match(y, x)
-  pos <- vctrs::vec_unique(pos)
-  pos <- vctrs::vec_sort(pos)
-  pos <- pos[!is.na(pos)]
-  vctrs::vec_slice(x, pos)
-}
-set_union <- function(x, y) {
-  vctrs::vec_unique(vctrs::vec_c(x, y))
 }

@@ -88,6 +88,7 @@ eval_relocate <- function(expr,
     allow_rename = allow_rename,
     allow_empty = allow_empty,
     allow_predicates = allow_predicates,
+    type = "relocate",
     error_call = error_call
   )
 
@@ -180,7 +181,7 @@ eval_relocate <- function(expr,
 }
 
 with_rename_errors <- function(expr, arg, error_call) {
-  try_fetch(
+  withCallingHandlers(
     expr,
     `tidyselect:::error_disallowed_rename` = function(cnd) {
       cli::cli_abort(
